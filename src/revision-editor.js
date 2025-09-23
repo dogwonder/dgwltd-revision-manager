@@ -30,7 +30,7 @@ const RevisionEditorEnhancements = () => {
 
         try {
             const response = await apiFetch({
-                path: `/dgw-revision-manager/v1/revisions/${postId}`,
+                path: `/dgw-revision-manager/v1/revisions/${postId}?limit=20`,
             });
 
             setRevisionData(response);

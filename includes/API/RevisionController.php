@@ -62,6 +62,11 @@ class RevisionController extends WP_REST_Controller {
                             'description' => __('The post ID to get revisions for.', 'dgwltd-revision-manager'),
                             'type' => 'integer',
                             'required' => true,
+                        ],
+                        'limit' => [
+                            'description' => __('Number of revisions to return. Default is timeline_limit setting.', 'dgwltd-revision-manager'),
+                            'type' => 'integer',
+                            'required' => false,
                         ]
                     ]
                 ]
@@ -135,8 +140,10 @@ class RevisionController extends WP_REST_Controller {
         }
 
         // Get all revisions for the post
+        $limit = $request->get_param('limit') ?: (get_option('dgwltd_revision_manager_settings')['timeline_limit'] ?? 6);
+
         $revisions = wp_get_post_revisions($post_id, [
-            'posts_per_page' => get_option('dgwltd_revision_manager_settings')['timeline_limit'] ?? 6,
+            'posts_per_page' => $limit,
             'orderby' => 'date',
             'order' => 'DESC'
         ]);
