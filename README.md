@@ -6,19 +6,21 @@ A modern WordPress plugin for managing revisions with timeline visualization and
 
 This plugin provides a modern approach to WordPress revision management, featuring:
 
-- **Timeline Visualization**: Interactive timeline showing current, past, and pending revisions
+- **Revision Mode Control**: Choose between standard WordPress revisions or approval workflow
+- **Timeline Visualization**: Interactive timeline showing current, past, and pending revisions (approval mode)
 - **Sidebar Editor Panel**: React-based sidebar panel in the block editor
 - **Enhanced Revision Editor**: Improved revision.php page with "Set as Current" functionality
 - **Non-Destructive Switching**: Switch between revisions without losing revision history
-- **Status Management**: Control revision behavior per post (open, pending, locked)
+- **Progressive Interface**: Clean, contextual controls that adapt to the selected revision mode
 
 ## Features
 
 ### 🎯 Editor Sidebar Panel
-- Visual timeline of revisions with status indicators
-- Post revision status controls (open/pending/locked)
-- One-click revision switching
-- Real-time status updates
+- **Revision Mode Selection**: Choose between Standard WordPress Revisions or Requires Approval
+- **Progressive Interface**: Timeline and controls only show when approval mode is selected
+- **Visual Timeline**: Interactive timeline with current, past, and pending revision indicators (approval mode)
+- **One-click Revision Switching**: Set any revision as current with confirmation modals
+- **Per-post Control**: Set revision mode individually for each post
 
 ### 📈 Timeline Visualization
 ```

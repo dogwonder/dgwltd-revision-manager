@@ -118,6 +118,32 @@ class RevisionController extends WP_REST_Controller {
                 ]
             ]
         );
+
+        // Update post revision mode
+        register_rest_route(
+            $this->namespace,
+            '/' . $this->rest_base . '/(?P<post_id>\d+)/mode',
+            [
+                [
+                    'methods' => WP_REST_Server::EDITABLE,
+                    'callback' => [$this, 'update_revision_mode'],
+                    'permission_callback' => [$this, 'update_mode_permissions_check'],
+                    'args' => [
+                        'post_id' => [
+                            'description' => __('The post ID to update revision mode for.', 'dgwltd-revision-manager'),
+                            'type' => 'integer',
+                            'required' => true,
+                        ],
+                        'mode' => [
+                            'description' => __('The revision mode to set.', 'dgwltd-revision-manager'),
+                            'type' => 'string',
+                            'enum' => ['open', 'pending'],
+                            'required' => true,
+                        ]
+                    ]
+                ]
+            ]
+        );
     }
 
     /**
@@ -138,6 +164,9 @@ class RevisionController extends WP_REST_Controller {
                 ['status' => 404]
             );
         }
+
+        // Get post revision mode (per-post setting)
+        $revision_mode = get_post_meta($post_id, '_dgw_revision_mode', true) ?: 'open';
 
         // Get all revisions for the post
         $limit = $request->get_param('limit') ?: (get_option('dgwltd_revision_manager_settings')['timeline_limit'] ?? 6);
@@ -181,12 +210,9 @@ class RevisionController extends WP_REST_Controller {
             $position++;
         }
 
-        // Get post revision status
-        $post_status = get_post_meta($post_id, '_dgw_revision_status', true) ?: 'open';
-
         return new WP_REST_Response([
             'post_id' => $post_id,
-            'post_status' => $post_status,
+            'revision_mode' => $revision_mode,
             'current_revision_id' => $current_revision_id,
             'timeline' => $timeline_data,
             'total_revisions' => count($timeline_data)
@@ -294,6 +320,38 @@ class RevisionController extends WP_REST_Controller {
     }
 
     /**
+     * Update post revision mode
+     *
+     * @since 1.0.0
+     * @param WP_REST_Request $request Full data about the request.
+     * @return WP_REST_Response|WP_Error Response object on success, or WP_Error object on failure.
+     */
+    public function update_revision_mode(WP_REST_Request $request) {
+        $post_id = (int) $request['post_id'];
+        $mode = sanitize_text_field($request->get_param('mode'));
+
+        $post = get_post($post_id);
+
+        if (!$post) {
+            return new WP_Error(
+                'rest_post_invalid_id',
+                __('Invalid post ID.', 'dgwltd-revision-manager'),
+                ['status' => 404]
+            );
+        }
+
+        // Update post revision mode
+        update_post_meta($post_id, '_dgw_revision_mode', $mode);
+
+        return new WP_REST_Response([
+            'success' => true,
+            'message' => __('Revision mode updated successfully.', 'dgwltd-revision-manager'),
+            'post_id' => $post_id,
+            'mode' => $mode
+        ]);
+    }
+
+    /**
      * Check permissions for getting revisions
      *
      * @since 1.0.0
@@ -331,6 +389,18 @@ class RevisionController extends WP_REST_Controller {
      * @return bool True if the request has edit access, false otherwise.
      */
     public function update_status_permissions_check(WP_REST_Request $request): bool {
+        $post_id = (int) $request['post_id'];
+        return current_user_can('edit_post', $post_id);
+    }
+
+    /**
+     * Check permissions for updating revision mode
+     *
+     * @since 1.0.0
+     * @param WP_REST_Request $request Full data about the request.
+     * @return bool True if the request has edit access, false otherwise.
+     */
+    public function update_mode_permissions_check(WP_REST_Request $request): bool {
         $post_id = (int) $request['post_id'];
         return current_user_can('edit_post', $post_id);
     }
