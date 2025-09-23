@@ -59,20 +59,18 @@ class EditorPanel {
      * @return void
      */
     public function render_revision_meta_box(\WP_Post $post): void {
-        // Add nonce field
+        // Add nonce field for any future form handling
         wp_nonce_field('dgw_revision_manager_meta', 'dgw_revision_manager_nonce');
 
-        // Get current status
+        // Get current status for display
         $current_status = get_post_meta($post->ID, '_dgw_revision_status', true) ?: 'open';
 
         echo '<div id="dgw-revision-manager-meta-box">';
-        echo '<p>' . esc_html__('This meta box will be replaced by the React component when the editor assets are loaded.', 'dgwltd-revision-manager') . '</p>';
-        echo '<label for="dgw_revision_status">' . esc_html__('Status:', 'dgwltd-revision-manager') . '</label>';
-        echo '<select name="dgw_revision_status" id="dgw_revision_status">';
-        echo '<option value="open"' . selected($current_status, 'open', false) . '>' . esc_html__('Open', 'dgwltd-revision-manager') . '</option>';
-        echo '<option value="pending"' . selected($current_status, 'pending', false) . '>' . esc_html__('Pending', 'dgwltd-revision-manager') . '</option>';
-        echo '<option value="locked"' . selected($current_status, 'locked', false) . '>' . esc_html__('Locked', 'dgwltd-revision-manager') . '</option>';
-        echo '</select>';
+        echo '<p>' . esc_html__('Revision management is handled by the sidebar panel. Use the "Revision Manager" option in the editor sidebar.', 'dgwltd-revision-manager') . '</p>';
+        echo '<p class="description">' . sprintf(
+            esc_html__('Current status: %s', 'dgwltd-revision-manager'),
+            '<strong>' . esc_html(ucfirst($current_status)) . '</strong>'
+        ) . '</p>';
         echo '</div>';
     }
 
@@ -84,23 +82,8 @@ class EditorPanel {
      * @return void
      */
     public function save_revision_meta(int $post_id): void {
-        // Check nonce
-        if (!isset($_POST['dgw_revision_manager_nonce']) ||
-            !wp_verify_nonce($_POST['dgw_revision_manager_nonce'], 'dgw_revision_manager_meta')) {
-            return;
-        }
-
-        // Check permissions
-        if (!current_user_can('edit_post', $post_id)) {
-            return;
-        }
-
-        // Save revision status
-        if (isset($_POST['dgw_revision_status'])) {
-            $status = sanitize_text_field($_POST['dgw_revision_status']);
-            if (in_array($status, ['open', 'pending', 'locked'], true)) {
-                update_post_meta($post_id, '_dgw_revision_status', $status);
-            }
-        }
+        // No longer needed since revision status is managed via REST API
+        // This method is kept for potential future meta box functionality
+        return;
     }
 }
