@@ -168,6 +168,18 @@ class RevisionController extends WP_REST_Controller {
         // Get post revision mode (per-post setting)
         $revision_mode = get_post_meta($post_id, '_dgw_revision_mode', true) ?: 'open';
 
+        // In "open" mode, don't interfere with WordPress - return minimal data
+        if ($revision_mode === 'open') {
+            return new WP_REST_Response([
+                'post_id' => $post_id,
+                'revision_mode' => $revision_mode,
+                'current_revision_id' => null,
+                'timeline' => [],
+                'total_revisions' => 0
+            ]);
+        }
+
+        // Only for "pending" mode - get revision data and manage current revision
         // Get all revisions for the post
         $limit = $request->get_param('limit') ?: (get_option('dgwltd_revision_manager_settings')['timeline_limit'] ?? 6);
 
@@ -342,6 +354,12 @@ class RevisionController extends WP_REST_Controller {
 
         // Update post revision mode
         update_post_meta($post_id, '_dgw_revision_mode', $mode);
+
+        // If switching to "open" mode, clean up any revision tracking meta
+        if ($mode === 'open') {
+            delete_post_meta($post_id, '_dgw_current_revision_id');
+            delete_post_meta($post_id, '_dgw_revision_status');
+        }
 
         return new WP_REST_Response([
             'success' => true,

@@ -38,10 +38,9 @@ This plugin provides a modern approach to WordPress revision management, featuri
 - Confirmation modals for safety
 - Success/error notifications
 
-### 🔒 Status Management
-- **Open**: Changes publish immediately (traditional WordPress)
-- **Pending**: Changes require approval workflow
-- **Locked**: Only editors can make changes
+### 🔒 Revision Mode Management
+- **Standard WordPress Revisions**: Plugin steps aside, allowing normal WordPress revision behavior
+- **Requires Approval**: Enables timeline visualization and approval workflow with pending/current revision states
 
 ## Installation
 
@@ -98,27 +97,30 @@ dgwltd-revision-manager/
 ### Basic Workflow
 
 1. **Open a post** in the block editor
-2. **Find the Revision Manager panel** in the sidebar (📄 icon)
-3. **Set the revision status** (open/pending/locked)
-4. **View the timeline** of revisions with visual indicators
-5. **Switch revisions** using "Set as Current" buttons
+2. **Find the Revision Manager panel** in the sidebar (🔄 icon)
+3. **Choose revision mode**: Standard WordPress Revisions or Requires Approval
+4. **For approval mode**: View timeline of revisions with visual indicators
+5. **Switch revisions** using "Set as Current" buttons (approval mode only)
 
 ### Advanced Features
 
-#### Timeline Navigation
-- Visual timeline shows revision relationships
+#### Timeline Navigation (Approval Mode)
+- Visual timeline shows revision relationships with status indicators
 - Click "View" to open revision in comparison editor
 - "Set as Current" promotes any revision to be the active version
+- Timeline only appears when "Requires Approval" mode is selected
 
 #### Revision Editor Integration
 - Enhanced `/wp-admin/revision.php` pages
 - Timeline context shows where revision fits
 - One-click switching with confirmation
 
-#### Status Control
-- **Per-post control** overrides global settings
-- **Visual indicators** show current status
-- **Real-time updates** when status changes
+#### Revision Mode Control
+- **Per-post control** with clean radio button interface
+- **Progressive disclosure** shows relevant features based on mode
+- **Real-time updates** when mode changes
+- **Standard mode**: Plugin stays out of the way, normal WordPress behavior
+- **Approval mode**: Full timeline and revision management features
 
 ## API Reference
 
@@ -138,11 +140,11 @@ POST /revisions/{revision_id}/set-current
 ```
 Sets a specific revision as the current/active version.
 
-#### Update Post Status
+#### Update Revision Mode
 ```
-PUT /revisions/{post_id}/status
+PUT /revisions/{post_id}/mode
 ```
-Updates the revision management status for a post.
+Updates the revision mode for a post (standard or approval).
 
 ### JavaScript Integration
 
@@ -170,7 +172,33 @@ await apiFetch({
     path: `/dgw-revision-manager/v1/revisions/${revisionId}/set-current`,
     method: 'POST'
 });
+
+// Update revision mode
+await apiFetch({
+    path: `/dgw-revision-manager/v1/revisions/${postId}/mode`,
+    method: 'PUT',
+    data: { mode: 'pending' } // 'open' or 'pending'
+});
 ```
+
+## Interface Design Philosophy
+
+This plugin follows a **progressive disclosure** approach:
+
+### 🎯 **Simplified Choice**
+- **Two clear options**: Standard WordPress behavior vs. Approval workflow
+- **No contradictory "disable revisions" option** - if you're using a revision manager, you want revision management
+- **Mode selection IS the status** - no redundant dropdowns or duplicate controls
+
+### 📱 **Contextual Interface**
+- **Standard mode**: Shows simple description, plugin stays out of the way
+- **Approval mode**: Reveals timeline and revision management features
+- **One place for all controls**: Everything revision-related in the sidebar panel
+
+### 🔄 **Per-Post Flexibility**
+- **Individual control**: Each post can have its own revision mode
+- **No admin settings pages needed**: Direct control where you edit
+- **Real-time switching**: Change modes and see immediate interface updates
 
 ## Technical Details
 
@@ -212,25 +240,30 @@ The original plugin remains available and functional. This new plugin provides a
 
 ## Development Roadmap
 
-### Phase 1 ✅ (Current)
-- [x] Core plugin architecture
-- [x] Timeline visualization
-- [x] Sidebar editor panel
-- [x] Revision switching
-- [x] Enhanced revision editor
+### Phase 1 ✅ (Completed)
+- [x] Core plugin architecture with modern WordPress development standards
+- [x] Simplified revision mode interface (Standard vs. Approval)
+- [x] Progressive disclosure UI design
+- [x] Timeline visualization for approval workflow
+- [x] Sidebar editor panel with contextual controls
+- [x] Non-destructive revision switching
+- [x] Enhanced revision editor with timeline context
+- [x] Per-post revision mode control
+- [x] REST API endpoints for mode and revision management
 
 ### Phase 2 (Future)
-- [ ] Advanced permissions system
-- [ ] Bulk revision operations
-- [ ] Revision approval workflows
-- [ ] Advanced filtering options
-- [ ] Performance optimizations
+- [ ] Advanced timeline filtering and search
+- [ ] Bulk revision operations across multiple posts
+- [ ] User role-based revision approval workflows
+- [ ] Revision diff improvements
+- [ ] Performance optimizations for large revision histories
 
 ### Phase 3 (Future)
-- [ ] Integration with existing revision plugin
-- [ ] Migration tools
-- [ ] Advanced reporting
-- [ ] Webhook integrations
+- [ ] Integration options with other revision plugins
+- [ ] Migration tools from legacy revision systems
+- [ ] Advanced reporting and analytics
+- [ ] Webhook integrations for external workflow systems
+- [ ] Automated revision cleanup policies
 
 ## Contributing
 

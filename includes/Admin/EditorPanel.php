@@ -59,18 +59,28 @@ class EditorPanel {
      * @return void
      */
     public function render_revision_meta_box(\WP_Post $post): void {
-        // Add nonce field for any future form handling
-        wp_nonce_field('dgw_revision_manager_meta', 'dgw_revision_manager_nonce');
-
-        // Get current status for display
-        $current_status = get_post_meta($post->ID, '_dgw_revision_status', true) ?: 'open';
+        // Check revision mode
+        $revision_mode = get_post_meta($post->ID, '_dgw_revision_mode', true) ?: 'open';
 
         echo '<div id="dgw-revision-manager-meta-box">';
-        echo '<p>' . esc_html__('Revision management is handled by the sidebar panel. Use the "Revision Manager" option in the editor sidebar.', 'dgwltd-revision-manager') . '</p>';
-        echo '<p class="description">' . sprintf(
-            esc_html__('Current status: %s', 'dgwltd-revision-manager'),
-            '<strong>' . esc_html(ucfirst($current_status)) . '</strong>'
-        ) . '</p>';
+
+        if ($revision_mode === 'open') {
+            echo '<p>' . esc_html__('This post uses standard WordPress revisions.', 'dgwltd-revision-manager') . '</p>';
+            echo '<p class="description">' . esc_html__('Revision management is available in the editor sidebar if needed.', 'dgwltd-revision-manager') . '</p>';
+        } else {
+            // Add nonce field for any future form handling
+            wp_nonce_field('dgw_revision_manager_meta', 'dgw_revision_manager_nonce');
+
+            // Get current status for display
+            $current_status = get_post_meta($post->ID, '_dgw_revision_status', true) ?: 'open';
+
+            echo '<p>' . esc_html__('Revision management is handled by the sidebar panel. Use the "Revision Manager" option in the editor sidebar.', 'dgwltd-revision-manager') . '</p>';
+            echo '<p class="description">' . sprintf(
+                esc_html__('Current status: %s', 'dgwltd-revision-manager'),
+                '<strong>' . esc_html(ucfirst($current_status)) . '</strong>'
+            ) . '</p>';
+        }
+
         echo '</div>';
     }
 
