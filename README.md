@@ -315,4 +315,6 @@ For issues and feature requests, please use the repository's issue tracker.
 
 ---
 
-**Made with ❤️ by [DGW.ltd](https://dgw.ltd/)**
+## Credits
+
+Inspired by and compatible with the original [fabrica-pending-revisions](https://github.com/wikitribune/fabrica-pending-revisions) plugin by Fabrica.
