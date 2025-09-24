@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from '@wordpress/element';
-import { useSelect } from '@wordpress/data';
+import { useSelect, useDispatch } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 import {
     PanelBody,
@@ -32,12 +32,55 @@ const RevisionManagerPanel = () => {
         return select('core/editor').getCurrentPostType();
     }, []);
 
+    const postUrl = useSelect((select) => {
+        const post = select('core/editor').getCurrentPost();
+        return post?.link || '';
+    }, []);
+
+    const { createNotice, removeNotice } = useDispatch('core/notices');
+
     // Load revision data on component mount and when postId changes
     useEffect(() => {
         if (postId) {
             loadRevisionData();
         }
     }, [postId]);
+
+    // Check for content mismatch and show notice
+    useEffect(() => {
+        const noticeId = 'dgw-content-mismatch';
+
+        // Always remove existing notice first
+        removeNotice(noticeId);
+
+        // Only show notice in pending mode with revision data
+        if (revisionMode === 'pending' && revisionData && revisionData.timeline && revisionData.timeline.length > 0) {
+            const currentRevision = revisionData.timeline.find(r => r.is_current);
+            const latestRevision = revisionData.timeline[0]; // First in DESC order
+
+            // Show notice if current revision differs from latest revision
+            if (currentRevision && latestRevision && currentRevision.id !== latestRevision.id) {
+                createNotice(
+                    'warning',
+                    __('You are editing content that differs from what visitors see. Latest changes are not yet published.', 'dgwltd-revision-manager'),
+                    {
+                        id: noticeId,
+                        isDismissible: true,
+                        actions: [
+                            {
+                                label: __('View Published Version', 'dgwltd-revision-manager'),
+                                onClick: () => window.open(postUrl, '_blank')
+                            },
+                            {
+                                label: __('Publish Latest Changes', 'dgwltd-revision-manager'),
+                                onClick: () => handleSetLatestAsCurrent()
+                            }
+                        ]
+                    }
+                );
+            }
+        }
+    }, [revisionMode, revisionData, postUrl, createNotice, removeNotice]);
 
     const loadRevisionData = async () => {
         setLoading(true);
@@ -78,6 +121,38 @@ const RevisionManagerPanel = () => {
         } catch (err) {
             setError(__('Failed to update revision mode.', 'dgwltd-revision-manager'));
             console.error('Error updating revision mode:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSetLatestAsCurrent = async () => {
+        if (!revisionData || !revisionData.timeline || revisionData.timeline.length === 0) {
+            return;
+        }
+
+        const latestRevision = revisionData.timeline[0];
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await apiFetch({
+                path: `/dgw-revision-manager/v1/revisions/${latestRevision.id}/set-current`,
+                method: 'POST'
+            });
+
+            if (response.success) {
+                // Remove the notice since we've resolved the mismatch
+                removeNotice('dgw-content-mismatch');
+
+                // Reload revision data to get updated timeline
+                await loadRevisionData();
+            } else {
+                setError(__('Failed to publish latest changes.', 'dgwltd-revision-manager'));
+            }
+        } catch (err) {
+            setError(__('Error publishing latest changes.', 'dgwltd-revision-manager'));
+            console.error('Error setting latest as current:', err);
         } finally {
             setLoading(false);
         }

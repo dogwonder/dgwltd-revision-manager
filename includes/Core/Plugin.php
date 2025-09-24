@@ -174,6 +174,11 @@ final class Plugin {
      */
     private function define_api_hooks(): void {
         add_action('rest_api_init', [$this->api_controller, 'register_routes']);
+
+        // Cache invalidation hooks
+        add_action('wp_save_post_revision', [$this->api_controller, 'invalidate_revision_cache_on_save']);
+        add_action('post_updated', [$this->api_controller, 'invalidate_revision_cache_on_update']);
+        add_action('delete_post_revision', [$this->api_controller, 'invalidate_revision_cache_on_delete'], 10, 2);
     }
 
     /**

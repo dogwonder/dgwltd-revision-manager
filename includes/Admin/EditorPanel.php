@@ -92,8 +92,28 @@ class EditorPanel {
      * @return void
      */
     public function save_revision_meta(int $post_id): void {
-        // No longer needed since revision status is managed via REST API
-        // This method is kept for potential future meta box functionality
-        return;
+        // Verify nonce for security
+        if (isset($_POST['dgw_revision_manager_nonce'])) {
+            if (!wp_verify_nonce($_POST['dgw_revision_manager_nonce'], 'dgw_revision_manager_meta')) {
+                return;
+            }
+        }
+
+        // Check user permissions
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+
+        // Skip auto-saves and bulk edits
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+
+        if (isset($_GET['bulk_edit'])) {
+            return;
+        }
+
+        // Currently no form fields to process, but nonce validation is in place
+        // for future meta box functionality
     }
 }

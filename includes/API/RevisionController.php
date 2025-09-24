@@ -179,7 +179,13 @@ class RevisionController extends WP_REST_Controller {
             ]);
         }
 
-        // Only for "pending" mode - get revision data and manage current revision
+        // Only for "pending" mode - check cache first
+        $cached_data = $this->get_cached_revision_data($post_id);
+        if ($cached_data !== null) {
+            return new WP_REST_Response($cached_data);
+        }
+
+        // Cache miss - build revision data and cache it
         // Get all revisions for the post
         $limit = $request->get_param('limit') ?: (get_option('dgwltd_revision_manager_settings')['timeline_limit'] ?? 6);
 
@@ -222,13 +228,19 @@ class RevisionController extends WP_REST_Controller {
             $position++;
         }
 
-        return new WP_REST_Response([
+        // Prepare response data
+        $response_data = [
             'post_id' => $post_id,
             'revision_mode' => $revision_mode,
             'current_revision_id' => $current_revision_id,
             'timeline' => $timeline_data,
             'total_revisions' => count($timeline_data)
-        ]);
+        ];
+
+        // Cache the data for future requests
+        $this->set_revision_data_cache($post_id, $response_data);
+
+        return new WP_REST_Response($response_data);
     }
 
     /**
@@ -240,6 +252,8 @@ class RevisionController extends WP_REST_Controller {
      */
     public function set_revision_as_current(WP_REST_Request $request) {
         $revision_id = (int) $request['revision_id'];
+
+        // First get the revision to find the post ID
         $revision = wp_get_post_revision($revision_id);
 
         if (!$revision) {
@@ -258,6 +272,17 @@ class RevisionController extends WP_REST_Controller {
                 'rest_post_invalid_id',
                 __('Invalid post ID.', 'dgwltd-revision-manager'),
                 ['status' => 404]
+            );
+        }
+
+        // Double-validate using our validation helper for consistency
+        $validated_revision = $this->validate_revision_for_post($revision_id, $post_id);
+
+        if (!$validated_revision) {
+            return new WP_Error(
+                'rest_revision_validation_failed',
+                __('Revision validation failed. The revision may have been deleted or corrupted.', 'dgwltd-revision-manager'),
+                ['status' => 400]
             );
         }
 
@@ -290,6 +315,9 @@ class RevisionController extends WP_REST_Controller {
 
         // Update revision meta to mark as current
         $this->update_revision_statuses($post_id, $revision_id);
+
+        // Invalidate cache since revision data has changed
+        $this->invalidate_revision_cache($post_id);
 
         return new WP_REST_Response([
             'success' => true,
@@ -352,6 +380,9 @@ class RevisionController extends WP_REST_Controller {
             );
         }
 
+        // Get previous mode for audit logging
+        $previous_mode = get_post_meta($post_id, '_dgw_revision_mode', true) ?: 'open';
+
         // Update post revision mode
         update_post_meta($post_id, '_dgw_revision_mode', $mode);
 
@@ -360,6 +391,12 @@ class RevisionController extends WP_REST_Controller {
             delete_post_meta($post_id, '_dgw_current_revision_id');
             delete_post_meta($post_id, '_dgw_revision_status');
         }
+
+        // Audit log for revision mode changes
+        $this->log_revision_mode_change($post_id, $previous_mode, $mode, $post->post_title);
+
+        // Invalidate cache since revision mode has changed
+        $this->invalidate_revision_cache($post_id);
 
         return new WP_REST_Response([
             'success' => true,
@@ -378,7 +415,14 @@ class RevisionController extends WP_REST_Controller {
      */
     public function get_revisions_permissions_check(WP_REST_Request $request): bool {
         $post_id = (int) $request['post_id'];
-        return current_user_can('edit_post', $post_id);
+
+        // Users need to be able to edit the post to view its revision timeline
+        if (!current_user_can('edit_post', $post_id)) {
+            return false;
+        }
+
+        // Additional capability check for viewing revisions
+        return current_user_can('read') && current_user_can('edit_posts');
     }
 
     /**
@@ -396,7 +440,24 @@ class RevisionController extends WP_REST_Controller {
             return false;
         }
 
-        return current_user_can('edit_post', $revision->post_parent);
+        $post_id = $revision->post_parent;
+
+        // Users need to be able to edit the post
+        if (!current_user_can('edit_post', $post_id)) {
+            return false;
+        }
+
+        // Additional checks for publishing revisions (similar to publish_posts capability)
+        $post = get_post($post_id);
+        if ($post && $post->post_status === 'publish') {
+            // For published posts, require publish capability for the post type
+            $post_type_obj = get_post_type_object($post->post_type);
+            if ($post_type_obj && !current_user_can($post_type_obj->cap->publish_posts)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -420,19 +481,85 @@ class RevisionController extends WP_REST_Controller {
      */
     public function update_mode_permissions_check(WP_REST_Request $request): bool {
         $post_id = (int) $request['post_id'];
-        return current_user_can('edit_post', $post_id);
+
+        // Users need to be able to edit the post
+        if (!current_user_can('edit_post', $post_id)) {
+            return false;
+        }
+
+        // Changing revision mode is a significant operation - require additional capabilities
+        $post = get_post($post_id);
+        if ($post) {
+            $post_type_obj = get_post_type_object($post->post_type);
+
+            // Require publish capability for the post type (editors and above)
+            if ($post_type_obj && !current_user_can($post_type_obj->cap->publish_posts)) {
+                return false;
+            }
+
+            // Additional check: Only allow admins and editors to change revision modes
+            // Authors cannot change revision workflows
+            if (!current_user_can('edit_others_posts')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
-     * Get current revision ID for a post
+     * Validate that a revision ID exists and belongs to the specified post
+     *
+     * @since 1.0.0
+     * @param int $revision_id The revision ID to validate.
+     * @param int $post_id The expected parent post ID.
+     * @return \WP_Post|false The revision object if valid, false otherwise.
+     */
+    private function validate_revision_for_post(int $revision_id, int $post_id) {
+        $revision = wp_get_post_revision($revision_id);
+
+        if (!$revision) {
+            return false;
+        }
+
+        if ($revision->post_parent !== $post_id) {
+            return false;
+        }
+
+        return $revision;
+    }
+
+    /**
+     * Get current revision ID for a post with validation
      *
      * @since 1.0.0
      * @param int $post_id The post ID.
-     * @return int|null The current revision ID or null if not set.
+     * @return int|null The current revision ID or null if not set/invalid.
      */
     private function get_current_revision_id(int $post_id): ?int {
         $revision_id = get_post_meta($post_id, '_dgw_current_revision_id', true);
-        return $revision_id ? (int) $revision_id : null;
+
+        if (!$revision_id) {
+            return null;
+        }
+
+        $revision_id = (int) $revision_id;
+
+        // Validate: Ensure revision exists and belongs to this post
+        $revision = $this->validate_revision_for_post($revision_id, $post_id);
+
+        if (!$revision) {
+            // Invalid revision - clean up invalid reference
+            delete_post_meta($post_id, '_dgw_current_revision_id');
+
+            if (WP_DEBUG) {
+                error_log("DGW Revision Manager: Cleaned up invalid current revision ID {$revision_id} for post {$post_id}");
+            }
+
+            return null;
+        }
+
+        return $revision_id;
     }
 
     /**
@@ -485,5 +612,191 @@ class RevisionController extends WP_REST_Controller {
                 update_metadata('post', $revision->ID, '_dgw_revision_status', $status);
             }
         }
+    }
+
+    /**
+     * Get cache key for revision data
+     *
+     * @since 1.0.0
+     * @param int $post_id The post ID.
+     * @param string $type The cache type (main, mode, status).
+     * @return string The cache key.
+     */
+    private function get_cache_key(int $post_id, string $type = 'main'): string {
+        return "dgw_revisions_{$type}_{$post_id}";
+    }
+
+    /**
+     * Get cached revision data
+     *
+     * @since 1.0.0
+     * @param int $post_id The post ID.
+     * @return array|null Cached data or null if not found/invalid.
+     */
+    private function get_cached_revision_data(int $post_id): ?array {
+        // Skip cache in debug mode with no-cache parameter
+        if (defined('WP_DEBUG') && WP_DEBUG && isset($_GET['no-cache'])) {
+            return null;
+        }
+
+        $cache_key = $this->get_cache_key($post_id);
+        $cached = get_transient($cache_key);
+
+        if ($cached !== false && is_array($cached)) {
+            // Validate cache freshness
+            if ($this->is_cache_valid($cached, $post_id)) {
+                return $cached;
+            }
+
+            // Cache is stale, delete it
+            delete_transient($cache_key);
+        }
+
+        return null;
+    }
+
+    /**
+     * Set revision data cache
+     *
+     * @since 1.0.0
+     * @param int $post_id The post ID.
+     * @param array $data The data to cache.
+     * @return void
+     */
+    private function set_revision_data_cache(int $post_id, array $data): void {
+        $cache_key = $this->get_cache_key($post_id);
+        $data['cached_at'] = current_time('timestamp');
+
+        set_transient($cache_key, $data, 5 * MINUTE_IN_SECONDS);
+    }
+
+    /**
+     * Check if cached data is still valid
+     *
+     * @since 1.0.0
+     * @param array $cached_data The cached data.
+     * @param int $post_id The post ID.
+     * @return bool True if cache is valid, false otherwise.
+     */
+    private function is_cache_valid(array $cached_data, int $post_id): bool {
+        if (!isset($cached_data['cached_at'])) {
+            return false;
+        }
+
+        // Check if post has been modified since cache was created
+        $post = get_post($post_id);
+        if (!$post) {
+            return false;
+        }
+
+        $post_modified = strtotime($post->post_modified_gmt);
+        $cache_created = $cached_data['cached_at'];
+
+        return $post_modified <= $cache_created;
+    }
+
+    /**
+     * Invalidate revision cache for a post
+     *
+     * @since 1.0.0
+     * @param int $post_id The post ID.
+     * @return void
+     */
+    public function invalidate_revision_cache(int $post_id): void {
+        $cache_key = $this->get_cache_key($post_id);
+        delete_transient($cache_key);
+
+        // Also clear related cache keys
+        delete_transient($this->get_cache_key($post_id, 'mode'));
+        delete_transient($this->get_cache_key($post_id, 'status'));
+    }
+
+    /**
+     * Invalidate cache when post is updated
+     *
+     * @since 1.0.0
+     * @param int $post_id The post ID.
+     * @return void
+     */
+    public function invalidate_revision_cache_on_update(int $post_id): void {
+        $this->invalidate_revision_cache($post_id);
+    }
+
+    /**
+     * Invalidate cache when revision is saved
+     *
+     * @since 1.0.0
+     * @param int $revision_id The revision ID.
+     * @return void
+     */
+    public function invalidate_revision_cache_on_save(int $revision_id): void {
+        $revision = wp_get_post_revision($revision_id);
+        if ($revision) {
+            $this->invalidate_revision_cache($revision->post_parent);
+        }
+    }
+
+    /**
+     * Invalidate cache when revision is deleted
+     *
+     * @since 1.0.0
+     * @param int $revision_id The revision ID.
+     * @param \WP_Post $revision The revision post object.
+     * @return void
+     */
+    public function invalidate_revision_cache_on_delete(int $revision_id, \WP_Post $revision): void {
+        $this->invalidate_revision_cache($revision->post_parent);
+    }
+
+    /**
+     * Log revision mode changes for audit trail
+     *
+     * @since 1.0.0
+     * @param int $post_id The post ID.
+     * @param string $previous_mode The previous revision mode.
+     * @param string $new_mode The new revision mode.
+     * @param string $post_title The post title for context.
+     * @return void
+     */
+    private function log_revision_mode_change(int $post_id, string $previous_mode, string $new_mode, string $post_title): void {
+        // Only log if mode actually changed
+        if ($previous_mode === $new_mode) {
+            return;
+        }
+
+        $current_user = wp_get_current_user();
+        $user_display = $current_user->display_name ?: $current_user->user_login;
+
+        // Only log to error log in debug mode or if explicitly enabled
+        if (WP_DEBUG || defined('DGW_REVISION_AUDIT_ERROR_LOG') && DGW_REVISION_AUDIT_ERROR_LOG) {
+            $log_entry = sprintf(
+                '[DGW Revision Manager] User "%s" (ID: %d) changed revision mode for post "%s" (ID: %d) from "%s" to "%s"',
+                $user_display,
+                $current_user->ID,
+                $post_title,
+                $post_id,
+                $previous_mode,
+                $new_mode
+            );
+
+            error_log($log_entry);
+        }
+
+        // Also store in post meta for admin interface (last 10 changes)
+        $audit_log = get_post_meta($post_id, '_dgw_revision_mode_audit', true) ?: [];
+
+        $audit_log[] = [
+            'timestamp' => current_time('timestamp'),
+            'user_id' => $current_user->ID,
+            'user_name' => $user_display,
+            'previous_mode' => $previous_mode,
+            'new_mode' => $new_mode,
+            'user_ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+        ];
+
+        // Keep only the last 10 entries
+        $audit_log = array_slice($audit_log, -10);
+
+        update_post_meta($post_id, '_dgw_revision_mode_audit', $audit_log);
     }
 }
