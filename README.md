@@ -255,48 +255,7 @@ await apiFetch({
 });
 ```
 
-## Interface Design Philosophy
-
-This plugin follows a **progressive disclosure** approach:
-
-### 🎯 **Simplified Choice**
-- **Two clear options**: Standard WordPress behavior vs. Approval workflow
-- **No contradictory "disable revisions" option** - if you're using a revision manager, you want revision management
-- **Mode selection IS the status** - no redundant dropdowns or duplicate controls
-
-### 📱 **Contextual Interface**
-- **Standard mode**: Shows simple description, plugin stays out of the way
-- **Approval mode**: Reveals timeline and revision management features
-- **One place for all controls**: Everything revision-related in the sidebar panel
-
-### 🔄 **Per-Post Flexibility**
-- **Individual control**: Each post can have its own revision mode
-- **No admin settings pages needed**: Direct control where you edit
 - **Real-time switching**: Change modes and see immediate interface updates
-
-## Technical Details
-
-### Built With
-- **@wordpress/scripts** - Modern WordPress development toolchain
-- **React** - UI components and state management
-- **WordPress Components** - Native WordPress UI components
-- **WordPress Data** - Data layer integration
-- **SCSS** - Styled with WordPress design system
-
-### Browser Support
-- Modern browsers supporting ES2017
-- WordPress admin interface compatibility
-- Responsive design for mobile/tablet editing
-
-### Performance
-- **10x Performance Improvement**: Timeline loading reduced from 200-500ms to 10-50ms
-- **Intelligent Caching**: 5-minute transient caching with 80-90% hit rate
-- **Automatic Cache Invalidation**: Smart cache clearing on revision changes
-- **Efficient REST API queries**: Optimized database queries with validation
-- **Lightweight JavaScript bundle**: Modern build tools and tree shaking
-- **Progressive enhancement approach**: Core functionality works without JavaScript
-- **Minimal database impact**: Caching reduces database load by 90%+
-- **Debug Support**: Cache bypass for development with `?no-cache=1`
 
 ## Compatibility
 
