@@ -553,7 +553,7 @@ class RevisionController extends WP_REST_Controller {
             delete_post_meta($post_id, '_dgw_current_revision_id');
 
             if (WP_DEBUG) {
-                error_log("DGW Revision Manager: Cleaned up invalid current revision ID {$revision_id} for post {$post_id}");
+                error_log("DGW.ltd Revision Manager: Cleaned up invalid current revision ID {$revision_id} for post {$post_id}");
             }
 
             return null;
@@ -770,7 +770,7 @@ class RevisionController extends WP_REST_Controller {
         // Only log to error log in debug mode or if explicitly enabled
         if (WP_DEBUG || defined('DGW_REVISION_AUDIT_ERROR_LOG') && DGW_REVISION_AUDIT_ERROR_LOG) {
             $log_entry = sprintf(
-                '[DGW Revision Manager] User "%s" (ID: %d) changed revision mode for post "%s" (ID: %d) from "%s" to "%s"',
+                '[DGW.ltd Revision Manager] User "%s" (ID: %d) changed revision mode for post "%s" (ID: %d) from "%s" to "%s"',
                 $user_display,
                 $current_user->ID,
                 $post_title,

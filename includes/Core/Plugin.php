@@ -191,14 +191,14 @@ final class Plugin {
     public function maybe_enqueue_revision_editor_assets(string $hook): void {
         // Debug: Log what hook we're getting
         if (WP_DEBUG) {
-            error_log("DGW Revision Manager - Hook: {$hook}, GET params: " . print_r($_GET, true));
+            error_log("DGW.ltd Revision Manager - Hook: {$hook}, GET params: " . print_r($_GET, true));
         }
 
         // Check if we're on the revision editor page
         // Hook for revision.php is typically just 'revision'
         if ('revision' === $hook || (isset($_GET['revision']) && is_numeric($_GET['revision']))) {
             if (WP_DEBUG) {
-                error_log("DGW Revision Manager - Loading revision editor assets");
+                error_log("DGW.ltd Revision Manager - Loading revision editor assets");
             }
             $this->assets->enqueue_revision_editor_assets();
         }

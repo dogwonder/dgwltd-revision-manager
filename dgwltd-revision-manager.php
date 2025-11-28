@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:         DGW Revision Manager
+ * Plugin Name:         DGW.ltd Revision Manager
  * Plugin URI:          https://dgw.ltd/
  * Description:         Modern WordPress revision management with timeline visualization and enhanced editor integration. Built with @wordpress/scripts and React components.
  * Version:             1.0.0
@@ -40,7 +40,7 @@ if (version_compare(PHP_VERSION, '8.0', '<')) {
         printf(
             '<div class="notice notice-error"><p>%s</p></div>',
             esc_html__(
-                'DGW Revision Manager requires PHP 8.0 or higher. Please update your PHP version.',
+                'DGW.ltd Revision Manager requires PHP 8.0 or higher. Please update your PHP version.',
                 'dgwltd-revision-manager'
             )
         );
@@ -53,7 +53,7 @@ if (version_compare($GLOBALS['wp_version'], '6.0', '<')) {
         printf(
             '<div class="notice notice-error"><p>%s</p></div>',
             esc_html__(
-                'DGW Revision Manager requires WordPress 6.0 or higher. Please update your WordPress installation.',
+                'DGW.ltd Revision Manager requires WordPress 6.0 or higher. Please update your WordPress installation.',
                 'dgwltd-revision-manager'
             )
         );
@@ -106,11 +106,11 @@ function init_plugin(): void {
     } catch (\Exception $e) {
         add_action('admin_notices', function () use ($e): void {
             printf(
-                '<div class="notice notice-error"><p><strong>DGW Revision Manager Error:</strong> %s</p></div>',
+                '<div class="notice notice-error"><p><strong>DGW.ltd Revision Manager Error:</strong> %s</p></div>',
                 esc_html($e->getMessage())
             );
         });
-        error_log('DGW Revision Manager initialization error: ' . $e->getMessage());
+        error_log('DGW.ltd Revision Manager initialization error: ' . $e->getMessage());
     }
 }
 
@@ -157,7 +157,7 @@ function deactivate_plugin(): void {
         // Clean up rewrite rules
         flush_rewrite_rules();
     } catch (\Exception $e) {
-        error_log('DGW Revision Manager deactivation error: ' . $e->getMessage());
+        error_log('DGW.ltd Revision Manager deactivation error: ' . $e->getMessage());
     }
 }
 register_deactivation_hook(__FILE__, __NAMESPACE__ . '\deactivate_plugin');

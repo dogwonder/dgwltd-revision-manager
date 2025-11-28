@@ -1,4 +1,4 @@
-# DGW Revision Manager
+# DGW.ltd Revision Manager
 
 A modern, enterprise-grade WordPress plugin for managing revisions with lightning-fast timeline visualization, content mismatch alerts, and enhanced editor integration. Built with @wordpress/scripts and React components for a seamless, secure editing experience.
 
